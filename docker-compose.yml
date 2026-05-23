@@ -1,0 +1,165 @@
+x-airflow-env: &airflow-env
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+  AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+  AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+  KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN}
+  AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+  AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+  AWS_DEFAULT_REGION: us-east-1
+  JAVA_HOME: /usr/lib/jvm/java-17-openjdk-arm64
+
+x-airflow-common: &airflow-common
+  build: .
+  environment:
+    <<: *airflow-env
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ./spark_jobs:/opt/airflow/spark_jobs
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+
+  # ─── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  # ─── Airflow Init ─────────────────────────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    command: db migrate
+    environment:
+      <<: *airflow-env
+      _AIRFLOW_DB_UPGRADE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: "admin"
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+      _AIRFLOW_WWW_USER_FIRSTNAME: "Admin"
+      _AIRFLOW_WWW_USER_LASTNAME: "User"
+      _AIRFLOW_WWW_USER_EMAIL: "admin@example.com"
+    restart: on-failure
+
+  # ─── Airflow Webserver ────────────────────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      retries: 5
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ─── Airflow Scheduler ───────────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ─── Spark Master ─────────────────────────────────────────────────────────────
+  spark-master:
+    image: arm64v8/spark:3.5.0
+    environment:
+      SPARK_MODE: master
+      SPARK_MASTER_HOST: spark-master
+    ports:
+      - "7077:7077"
+      - "8181:8080"
+    volumes:
+      - ./spark_jobs:/opt/spark_jobs
+      - ./spark_jobs/jars:/opt/spark/jars/
+    entrypoint: ["/opt/spark/sbin/../bin/spark-class", "org.apache.spark.deploy.master.Master"]
+
+  # ─── Spark Worker ─────────────────────────────────────────────────────────────
+  spark-worker:
+    image: arm64v8/spark:3.5.0
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_MEMORY: 2G
+      SPARK_WORKER_CORES: 2
+    depends_on:
+      - spark-master
+    volumes:
+      - ./spark_jobs:/opt/spark_jobs
+      - ./spark_jobs/jars:/opt/spark/jars/
+    entrypoint: ["/opt/spark/sbin/../bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
+
+  # ─── MinIO ────────────────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      retries: 3
+
+  # ─── MinIO Init ───────────────────────────────────────────────────────────────
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+        mc mb --ignore-existing local/staging &&
+        mc mb --ignore-existing local/ods &&
+        mc mb --ignore-existing local/dds &&
+        mc mb --ignore-existing local/cdm &&
+        echo 'Buckets created!'
+      "
+
+  # ─── JupyterLab ───────────────────────────────────────────────────────────────
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyter
+    user: root
+    environment:
+      JUPYTER_TOKEN: "jupyter"
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./spark_jobs:/home/jovyan/spark_jobs
+    depends_on:
+      - spark-master
+      - minio
+
+volumes:
+  postgres_data:
+  minio_data:
