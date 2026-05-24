@@ -23,7 +23,7 @@ def main():
 
     df_order_items = df_order_items.select(
         col("order_id").alias("order_id__pk_fk"),
-        col("order_item_id").alias("order_id__pk"),
+        col("order_item_id").alias("order_item_id__pk"),
         col("product_id").alias("product_id__fk"),
         col("seller_id").alias("seller_id__fk"),
         col("price").alias("price_amount"),
