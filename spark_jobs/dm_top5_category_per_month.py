@@ -26,8 +26,7 @@ def main():
                  .groupBy(
                      col("do.order_purchase_year"),
                      col("do.order_purchase_month"),
-                     col("dp.product_category_name"),
-                    current_timestamp().alias("__update_dttm"))
+                     col("dp.product_category_name"))
                  .agg(countDistinct(col("do.order_id__pk")).alias("order_qty"))
                  .where(col("order_qty") > 1)
                  .withColumn("rank",row_number()
@@ -36,6 +35,7 @@ def main():
                                                      .orderBy(col("order_qty").desc())))
                  .filter(col("rank") <= 5)
                  .drop("rank")
+                 .withColumn("__update_dttm",current_timestamp())
                 )
 
     df_result.write \

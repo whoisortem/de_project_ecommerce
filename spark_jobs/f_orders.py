@@ -3,10 +3,6 @@ import json
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, current_timestamp, year, month
 
-s3_path_staging = os.getenv("S3_PATH_STAGING")
-s3_path_ods = os.getenv("S3_PATH_ODS")
-datafolder_name = os.getenv("DATAFOLDER_NAME")
-
 def main():
 
     s3_path_staging = os.getenv("S3_PATH_STAGING")

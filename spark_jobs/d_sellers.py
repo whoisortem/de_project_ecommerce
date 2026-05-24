@@ -10,7 +10,7 @@ def main():
     datafolder_name = os.getenv("DATAFOLDER_NAME")
     db_url = os.getenv("DB_URL")
     db_properties = json.loads(os.environ.get("DB_PROPERTIES"))
-    table = 'df_sellers'
+    table = 'd_sellers'
 
     spark = SparkSession.builder.getOrCreate()
 
