@@ -1,32 +1,40 @@
-# Краткое содержание проекта
+# E-commerce ETL Pipeline
 
-ETL-пайплайн данных для Ecommerce.
-Исходные данные были взяты с Kaggle.
-Пайплайн поочередно обрабатывает данные и складывает их в 3 слоя (Staging, ODS, CDM), находящиеся в S3.
+Пайплайн для обработки данных e-commerce магазина. Данные взял с Kaggle, прогнал через три слоя (Staging → ODS → CDM) и положил в S3 и PostgreSQL.
 
-## Стек:
-* **Хранение данных** — S3 (MinIO) | DB (PostgreSQL)
-* **Обработка данных** — PySpark
-* **Оркестрация данных** — Airflow
-* **Тестирование и валидация кода** — Jupyter Notebook
+## Стек
 
-# Результат
+- **S3 (MinIO)** — Data Lake
+- **PostgreSQL** — реляционное хранилище
+- **PySpark** — обработка данных
+- **Airflow** — оркестрация
+- **Jupyter Notebook** — разработка и проверка джобов
 
-Получены сырые и готовые данные, которые хранятся как в Data Lake (S3), так и в PostgreSQL:
-* В **Staging** хранятся raw data, сохраненные через API.
-* В **ODS** хранятся очищенные данные в формате **Snowflake Schema** — 3 таблицы фактов (`f_orders`, `f_order_items` и `f_order_payments`), а также 3 справочника (`d_customers`, `d_products` и `d_sellers`). На основе полученных таблиц можно строить будущую аналитическую BI-отчетность.
-* В **CDM** хранятся готовые витрины данных для бизнеса: `dm_count_status_orders` (подсчет заказов по статусам на сегодняшний день) и `dm_top5_category_per_month` (подсчет топ-5 самых популярных категорий товаров в разрезе год-месяц).
+## Как устроено
 
-# Структура папок
-* **spark-jobs** — хранит джобы, которые собирают витрины данных
-* **dags** — содержит процессы оркестрации Airflow
+**Staging** — сырые данные как есть, загружены через API.
 
-# Скриншоты проекта
-![Корректность отработки дагов](screenshots/status_dags.png)
-![Скриншот существующих таблиц в PostgreSQL](screenshots/postgresql_tables.png)
-![Результат вывода datamart dm_count_status_orders](screenshots/dm_count_status_orders.png)
-![Результат вывода datamart dm_top5_category_per_month в Data Lake](screenshots/dm_top5_category_per_month.png)
-![Результат вывода таблицы f_order_items в PostgreSQL](screenshots/select_f_order_items.png)
+**ODS** — очищенные данные, Snowflake Schema. Три таблицы фактов: `f_orders`, `f_order_items`, `f_order_payments`. Три справочника: `d_customers`, `d_products`, `d_sellers`. Отсюда можно строить BI-отчётность.
 
-# Контакты
-Telegram: @whoisortem
+**CDM** — витрины для бизнеса:
+- `dm_count_status_orders` — заказы по статусам на сегодня
+- `dm_top5_category_per_month` — топ-5 категорий товаров в разрезе месяц/год
+
+## Структура репозитория
+
+```
+├── dags/          # оркестрация Airflow
+└── spark-jobs/    # джобы для построения витрин
+```
+
+## Скриншоты
+
+![DAG-и отработали корректно](screenshots/status_dags.png)
+![Таблицы в PostgreSQL](screenshots/postgresql_tables.png)
+![dm_count_status_orders](screenshots/dm_count_status_orders.png)
+![dm_top5_category_per_month в Data Lake](screenshots/dm_top5_category_per_month.png)
+![f_order_items в PostgreSQL](screenshots/select_f_order_items.png)
+
+## Контакты
+
+Telegram: [@whoisortem](https://t.me/whoisortem)
