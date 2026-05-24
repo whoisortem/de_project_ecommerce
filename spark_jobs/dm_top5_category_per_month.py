@@ -1,13 +1,16 @@
 import os
+import json
 from pyspark.sql import SparkSession, Window
-from pyspark.sql.functions import col, countDistinct, row_number
+from pyspark.sql.functions import col, countDistinct, row_number, current_timestamp
 
-s3_path_staging = os.getenv("S3_PATH_STAGING")
-s3_path_ods = os.getenv("S3_PATH_ODS")
-s3_path_cdm= os.getenv("S3_PATH_CDM")
-datafolder_name = os.getenv("DATAFOLDER_NAME")
+def main():
 
-def write_top5_category_per_month():
+    s3_path_cdm = os.getenv("S3_PATH_CDM")
+    s3_path_ods = os.getenv("S3_PATH_ODS")
+    datafolder_name = os.getenv("DATAFOLDER_NAME")
+    db_url = os.getenv("DB_URL")
+    db_properties = json.loads(os.environ.get("DB_PROPERTIES"))
+    table = 'dm_top5_category_per_month'
 
     spark = SparkSession.builder.getOrCreate()
 
@@ -23,7 +26,8 @@ def write_top5_category_per_month():
                  .groupBy(
                      col("do.order_purchase_year"),
                      col("do.order_purchase_month"),
-                     col("dp.product_category_name"))
+                     col("dp.product_category_name"),
+                    current_timestamp().alias("__update_dttm"))
                  .agg(countDistinct(col("do.order_id__pk")).alias("order_qty"))
                  .where(col("order_qty") > 1)
                  .withColumn("rank",row_number()
@@ -36,9 +40,17 @@ def write_top5_category_per_month():
 
     df_result.write \
         .mode("overwrite") \
-        .parquet(f"{s3_path_cdm}/{datafolder_name}/dm_top5_category_per_month")
-    
+        .parquet(f"{s3_path_cdm}/{datafolder_name}/{table}")
+
+    df_result.write \
+    .format("jdbc") \
+    .option("url", db_url) \
+    .option("dbtable", f"cdm.{table}") \
+    .options(**db_properties) \
+    .mode("overwrite") \
+    .save()
+
     spark.stop()
 
-
-write_top5_category_per_month()
+if __name__ == "__main__":
+    main()

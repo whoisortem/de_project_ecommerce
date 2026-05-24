@@ -1,13 +1,16 @@
 import os
+import json
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, count, current_date
 
-s3_path_staging = os.getenv("S3_PATH_STAGING")
-s3_path_ods = os.getenv("S3_PATH_ODS")
-s3_path_cdm= os.getenv("S3_PATH_CDM")
-datafolder_name = os.getenv("DATAFOLDER_NAME")
+def main():
 
-def write_dm_count_status_orders():
+    s3_path_cdm = os.getenv("S3_PATH_CDM")
+    s3_path_ods = os.getenv("S3_PATH_ODS")
+    datafolder_name = os.getenv("DATAFOLDER_NAME")
+    db_url = os.getenv("DB_URL")
+    db_properties = json.loads(os.environ.get("DB_PROPERTIES"))
+    table = 'dm_count_status_orders'
 
     spark = SparkSession.builder.getOrCreate()
 
@@ -20,9 +23,17 @@ def write_dm_count_status_orders():
     
     df_count_status_orders.write \
         .mode("overwrite") \
-        .parquet(f"{s3_path_cdm}/{datafolder_name}/dm_count_status_orders")
+        .parquet(f"{s3_path_cdm}/{datafolder_name}/{table}")
+
+    df_count_status_orders.write \
+    .format("jdbc") \
+    .option("url", db_url) \
+    .option("dbtable", f"cdm.{table}") \
+    .options(**db_properties) \
+    .mode("overwrite") \
+    .save()
 
     spark.stop()
 
-
-write_dm_count_status_orders()
+if __name__ == "__main__":
+    main()

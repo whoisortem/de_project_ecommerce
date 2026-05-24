@@ -1,12 +1,16 @@
 import os
+import json
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, current_timestamp
 
-s3_path_staging = os.getenv("S3_PATH_STAGING")
-s3_path_ods = os.getenv("S3_PATH_ODS")
-datafolder_name = os.getenv("DATAFOLDER_NAME")
+def main():
 
-def write_d_sellers():
+    s3_path_staging = os.getenv("S3_PATH_STAGING")
+    s3_path_ods = os.getenv("S3_PATH_ODS")
+    datafolder_name = os.getenv("DATAFOLDER_NAME")
+    db_url = os.getenv("DB_URL")
+    db_properties = json.loads(os.environ.get("DB_PROPERTIES"))
+    table = 'df_sellers'
 
     spark = SparkSession.builder.getOrCreate()
 
@@ -25,9 +29,17 @@ def write_d_sellers():
 
     df_sellers.write \
         .mode("overwrite") \
-        .parquet(f"{s3_path_ods}/{datafolder_name}/d_sellers")
+        .parquet(f"{s3_path_ods}/{datafolder_name}/{table}")
+    
+    df_sellers.write \
+    .format("jdbc") \
+    .option("url", db_url) \
+    .option("dbtable", f"ods.{table}") \
+    .options(**db_properties) \
+    .mode("overwrite") \
+    .save()
 
     spark.stop()
 
-write_d_sellers()
-
+if __name__ == "__main__":
+    main()

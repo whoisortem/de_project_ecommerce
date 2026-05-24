@@ -1,4 +1,5 @@
 import os
+import json
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, current_timestamp, year, month
 
@@ -6,7 +7,14 @@ s3_path_staging = os.getenv("S3_PATH_STAGING")
 s3_path_ods = os.getenv("S3_PATH_ODS")
 datafolder_name = os.getenv("DATAFOLDER_NAME")
     
-def write_f_order_items():
+def main():
+
+    s3_path_staging = os.getenv("S3_PATH_STAGING")
+    s3_path_ods = os.getenv("S3_PATH_ODS")
+    datafolder_name = os.getenv("DATAFOLDER_NAME")
+    db_url = os.getenv("DB_URL")
+    db_properties = json.loads(os.environ.get("DB_PROPERTIES"))
+    table = 'f_order_items'
 
     spark = SparkSession.builder.getOrCreate()
 
@@ -30,9 +38,17 @@ def write_f_order_items():
 
     df_order_items.write \
         .mode("overwrite") \
-        .parquet(f"{s3_path_ods}/{datafolder_name}/f_order_items")
+        .parquet(f"{s3_path_ods}/{datafolder_name}/{table}")
     
+    df_order_items.write \
+    .format("jdbc") \
+    .option("url", db_url) \
+    .option("dbtable", f"ods.{table}") \
+    .options(**db_properties) \
+    .mode("overwrite") \
+    .save()
+
     spark.stop()
 
-
-write_f_order_items()
+if __name__ == "__main__":
+    main()
