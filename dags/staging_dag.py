@@ -15,6 +15,7 @@ default_args = {
 
 kaggle_env = Variable.get("kaggle_env", deserialize_json=True)
 s3_env_values = Variable.get("s3_env_values", deserialize_json=True)
+env = {**kaggle_env, **s3_env_values} 
 
 
 with DAG(
@@ -26,7 +27,7 @@ with DAG(
     download_from_s3 = BashOperator(
         task_id='get_brazilian_ecommerce_data_into_s3',
         bash_command='python /opt/airflow/spark_jobs/s3_upload_raw_data.py',
-        env={**kaggle_env, **s3_env_values} 
+        env=env
     )
 
     trigger_ods_dag = TriggerDagRunOperator(
