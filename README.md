@@ -33,7 +33,7 @@
 ![Таблицы в PostgreSQL](screenshots/postgresql_tables.png)
 ![dm_count_status_orders](screenshots/dm_count_status_orders.png)
 ![dm_top5_category_per_month в Data Lake](screenshots/dm_top5_category_per_month.png)
-![f_order_items в PostgreSQL](screenshots/select_f_order_items.png)
+![f_orders в PostgreSQL](screenshots/select_f_orders.png)
 
 ## Контакты
 
